@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Euro, Users, PieChart, ShieldCheck, ShieldAlert, Send, Layers, ArrowRight } from "lucide-react";
 import { useNba } from "@/lib/nba-store";
@@ -117,7 +117,7 @@ export function MarketingTab({ onOpenCustomer }: { onOpenCustomer: (id: string) 
                 {rows.map((c) => {
                   const flagged = c.customer_id === "MG-100004" || !!c.current_nba.blocked_by_hard_rule;
                   return (
-                    <>
+                    <Fragment key={c.customer_id}>
                       <tr
                         key={c.customer_id}
                         className={cn(
@@ -153,7 +153,7 @@ export function MarketingTab({ onOpenCustomer }: { onOpenCustomer: (id: string) 
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
                 {rows.length === 0 && (
