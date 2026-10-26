@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Zap, LayoutDashboard, UserRound, RefreshCw } from "lucide-react";
+import { LayoutDashboard, UserRound, RefreshCw, Dices, type LucideIcon } from "lucide-react";
+import { toast } from "sonner";
 import { NbaProvider, useNba } from "@/lib/nba-store";
 import { MarketingTab } from "@/components/nba/MarketingTab";
 import { CustomerTab } from "@/components/nba/CustomerTab";
 import { ReplayTab } from "@/components/nba/ReplayTab";
 import { Toaster } from "@/components/ui/sonner";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -23,7 +25,7 @@ export const Route = createFileRoute("/")({
 });
 
 type Tab = "marketing" | "customer" | "replay";
-const TABS: { id: Tab; label: string; icon: typeof Zap }[] = [
+const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
   { id: "marketing", label: "Marketing Orchestration", icon: LayoutDashboard },
   { id: "customer", label: "Customer 360° / Agent Assist", icon: UserRound },
   { id: "replay", label: "Event Stream Replay (Deep Dive B)", icon: RefreshCw },
@@ -31,24 +33,30 @@ const TABS: { id: Tab; label: string; icon: typeof Zap }[] = [
 
 function Shell() {
   const [tab, setTab] = useState<Tab>("marketing");
-  const { setSelectedId, processed } = useNba();
+  const { setSelectedId, processed, sampleRandom } = useNba();
   const open = (id: string) => { setSelectedId(id); setTab("customer"); };
+  const sample = () => {
+    const next = sampleRandom();
+    toast.success("5 random customers sampled", { description: next.map((c) => c.customer_id).join(" · ") });
+  };
 
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-30 bg-gradient-navy text-navy-foreground shadow-card">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-amber">
-              <Zap className="h-5 w-5 text-accent-foreground" />
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-4">
+          <div className="leading-tight">
+            <div className="font-display text-lg font-bold tracking-tight text-navy-foreground">
+              MAINGAU <span className="text-accent">NBA Engine</span>
             </div>
-            <div>
-              <div className="font-display text-lg font-bold tracking-tight">MAINGAU <span className="text-accent">NBA Engine</span></div>
-              <div className="text-xs text-navy-muted">Strom · Gas · Mobilfunk · Internet · Autostrom · Smart Living</div>
-            </div>
+            <div className="mt-1 text-xs text-navy-muted">Strom · Gas · Mobilfunk · Internet · Autostrom · Smart Living</div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-navy-muted">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-success" /> Stream live · {Object.keys(processed).length} events applied
+          <div className="flex items-center gap-4">
+            <Button size="sm" onClick={sample} className="bg-gradient-amber font-semibold text-accent-foreground hover:opacity-90">
+              <Dices className="h-4 w-4" /> Sample 5 Random Customers
+            </Button>
+            <span className="flex items-center gap-2 text-xs text-navy-muted">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-success" /> Stream live · {Object.keys(processed).length} events applied
+            </span>
           </div>
         </div>
         <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-6">

@@ -58,20 +58,25 @@ export function churnTone(p: number) {
 }
 
 /** Strict GDPR marker: shown whenever profiling/analytics consent is missing or withdrawn. */
-export function ProfilingBadge({ state }: { state: ProfilingState }) {
+export function ProfilingBadge({ state, onDark }: { state: ProfilingState; onDark?: boolean }) {
   if (state === "granted") return null;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-warning/50 bg-warning/15 px-2.5 py-0.5 text-xs font-semibold text-warning-foreground">
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+        onDark ? "border-accent/60 bg-accent/15 text-accent" : "border-warning/50 bg-warning/15 text-warning-foreground",
+      )}
+    >
       <ShieldAlert className="h-3.5 w-3.5" />
       {`Profiling Consent ${state === "withdrawn" ? "Withdrawn" : "Not Given"} (Art. 6 GDPR)`}
     </span>
   );
 }
 
-export function CustomerProfilingBadge({ c }: { c: PoolCustomer }) {
+export function CustomerProfilingBadge({ c, onDark }: { c: PoolCustomer; onDark?: boolean }) {
   const state = profilingState(c);
   if (state === "granted") return null;
-  return <ProfilingBadge state={state} />;
+  return <ProfilingBadge state={state} onDark={onDark} />;
 }
 
 export function primarySegment(c: CustomerNBA) {
