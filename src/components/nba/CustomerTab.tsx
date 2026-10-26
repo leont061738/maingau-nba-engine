@@ -14,7 +14,7 @@ const contractName: Record<string, string> = { Strom: "StromKomfort", Gas: "GasK
 
 export function CustomerTab() {
   const { customers, selectedId, setSelectedId, logFeedback, feedback, recentlyUpdated } = useNba();
-  const c = customers.find((x) => x.customer_id === selectedId) ?? customers[0];
+  const c = customers.find((x) => x.customer_id === selectedId) ?? customers[0]!;
   const nba = c.current_nba;
   const ch = channelMeta[nba.channel];
   const tone = churnTone(c.churn_prob);

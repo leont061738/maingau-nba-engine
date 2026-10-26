@@ -47,7 +47,7 @@ export function NbaProvider({ children }: { children: ReactNode }) {
   const [processed, setProcessed] = useState<Store["processed"]>({});
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [recentlyUpdated, setRecentlyUpdated] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState(INITIAL_CUSTOMERS[0].customer_id);
+  const [selectedId, setSelectedId] = useState(INITIAL_CUSTOMERS[0]?.customer_id ?? "");
 
   const applyEvent = useCallback((evt: StreamEvent) => {
     setCustomers((prev) => {
