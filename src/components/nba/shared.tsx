@@ -58,7 +58,7 @@ export function churnTone(p: number) {
 }
 
 /** Strict GDPR marker: shown whenever profiling/analytics consent is missing or withdrawn. */
-export function ProfilingBadge({ state, onDark }: { state: ProfilingState; onDark?: boolean }) {
+export function ProfilingBadge({ state, onDark }: { state: ProfilingState; onDark?: boolean | undefined }) {
   if (state === "granted") return null;
   return (
     <span
@@ -73,7 +73,7 @@ export function ProfilingBadge({ state, onDark }: { state: ProfilingState; onDar
   );
 }
 
-export function CustomerProfilingBadge({ c, onDark }: { c: PoolCustomer; onDark?: boolean }) {
+export function CustomerProfilingBadge({ c, onDark }: { c: PoolCustomer; onDark?: boolean | undefined }) {
   const state = profilingState(c);
   if (state === "granted") return null;
   return <ProfilingBadge state={state} onDark={onDark} />;
