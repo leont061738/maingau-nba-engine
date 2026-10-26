@@ -8,3 +8,8 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+## Rules
+
+- `src/lib/pitch.ts` owns the profiling-consent compliance guard and the model/hypothesis state; `src/data/pitchPool.ts` owns the extended demo pool. Keep every state transition routed through `enforceProfiling` so no code path can surface a personalized offer to a customer without profiling consent.
+- Demo data flows one way: `src/data/mockData.ts` (user-supplied shapes) -> `pitchPool.ts` -> `nba-store.tsx` -> tabs. Do not put pool profiles or KPI targets into `mockData.ts`.

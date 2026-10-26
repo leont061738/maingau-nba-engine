@@ -2,6 +2,7 @@ import { useState } from "react";
 import { RefreshCw, Play, Database, Radio, CheckCircle2, Loader2, ArrowRight, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { useNba, REPLAY_EVENTS } from "@/lib/nba-store";
+import { POOL_BY_ID } from "@/data/pitchPool";
 import type { CustomerNBA, StreamEvent } from "@/data/mockData";
 import { ActionBadge, channelMeta, eur } from "./shared";
 import { Button } from "@/components/ui/button";
@@ -82,7 +83,8 @@ export function ReplayTab({ onOpenCustomer }: { onOpenCustomer: (id: string) => 
           {REPLAY_EVENTS.map((evt, idx) => {
             const done = processed[evt.event_id];
             const isRunning = running === evt.event_id;
-            const cust = customers.find((c) => c.customer_id === evt.customer_id);
+            const cust = customers.find((c) => c.customer_id === evt.customer_id) ?? POOL_BY_ID.get(evt.customer_id);
+            const inSample = customers.some((c) => c.customer_id === evt.customer_id);
             return (
               <div key={evt.event_id} className={cn("rounded-xl border bg-card p-5 shadow-card transition", isRunning && "shadow-glow")}>
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -93,10 +95,19 @@ export function ReplayTab({ onOpenCustomer }: { onOpenCustomer: (id: string) => 
                     </div>
                     <div className="mt-2 font-semibold">
                       {evt.event_type.replace(/_/g, " ")} ·{" "}
-                      <button className="font-mono text-chart-2 underline-offset-2 hover:underline" onClick={() => onOpenCustomer(evt.customer_id)}>
-                        {evt.customer_id}
-                      </button>{" "}
+                      {inSample ? (
+                        <button className="font-mono text-chart-2 underline-offset-2 hover:underline" onClick={() => onOpenCustomer(evt.customer_id)}>
+                          {evt.customer_id}
+                        </button>
+                      ) : (
+                        <span className="font-mono text-chart-2">{evt.customer_id}</span>
+                      )}{" "}
                       <span className="font-normal text-muted-foreground">({cust?.name})</span>
+                      {!inSample && (
+                        <span className="mt-1 block text-xs font-normal text-warning-foreground">
+                          Not in the current sample — replay runs against the pool baseline.
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">{evt.description}</p>
                     <p className="mt-1 text-sm font-medium">{evt.impact_description}</p>
