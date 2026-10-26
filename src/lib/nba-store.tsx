@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import { INITIAL_CUSTOMERS, REPLAY_EVENTS, type CustomerNBA, type StreamEvent } from "@/data/mockData";
 
-export type Feedback = { customer_id: string; action: string; at: string; note?: string };
+export type Feedback = { customer_id: string; action: string; at: string; note?: string | undefined };
 
 interface Store {
   customers: CustomerNBA[];

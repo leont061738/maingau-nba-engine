@@ -38,7 +38,7 @@ export function ActionBadge({ type }: { type: Nba["action_type"] }) {
   );
 }
 
-export function ComplianceBadge({ blocked }: { blocked?: string }) {
+export function ComplianceBadge({ blocked }: { blocked?: string | undefined }) {
   return blocked ? (
     <span className="inline-flex items-center gap-1 rounded-full bg-destructive px-2.5 py-0.5 text-xs font-semibold text-destructive-foreground">
       <ShieldAlert className="h-3.5 w-3.5" /> Hard Rule Blocked

@@ -44,7 +44,7 @@ export function ReplayTab({ onOpenCustomer }: { onOpenCustomer: (id: string) => 
     for (let i = 0; i < STEPS.length; i++) {
       setStep(i);
       await new Promise((r) => setTimeout(r, 650));
-      setLog((l) => [...l, STEPS[i]]);
+      setLog((l) => [...l, STEPS[i] ?? ""]);
     }
     applyEvent(evt);
     setRunning(null);
