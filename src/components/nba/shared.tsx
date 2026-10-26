@@ -1,5 +1,6 @@
 import { Mail, MonitorSmartphone, Phone, BellRing, ShieldAlert, ShieldCheck } from "lucide-react";
 import type { CustomerNBA } from "@/data/mockData";
+import { profilingState, type PoolCustomer, type ProfilingState } from "@/lib/pitch";
 import { cn } from "@/lib/utils";
 
 type Nba = CustomerNBA["current_nba"];
@@ -54,6 +55,23 @@ export function churnTone(p: number) {
   if (p < 0.15) return { bar: "bg-success", text: "text-success" };
   if (p <= 0.25) return { bar: "bg-warning", text: "text-warning-foreground" };
   return { bar: "bg-destructive", text: "text-destructive" };
+}
+
+/** Strict GDPR marker: shown whenever profiling/analytics consent is missing or withdrawn. */
+export function ProfilingBadge({ state }: { state: ProfilingState }) {
+  if (state === "granted") return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-warning/50 bg-warning/15 px-2.5 py-0.5 text-xs font-semibold text-warning-foreground">
+      <ShieldAlert className="h-3.5 w-3.5" />
+      {`Profiling Consent ${state === "withdrawn" ? "Withdrawn" : "Not Given"} (Art. 6 GDPR)`}
+    </span>
+  );
+}
+
+export function CustomerProfilingBadge({ c }: { c: PoolCustomer }) {
+  const state = profilingState(c);
+  if (state === "granted") return null;
+  return <ProfilingBadge state={state} />;
 }
 
 export function primarySegment(c: CustomerNBA) {

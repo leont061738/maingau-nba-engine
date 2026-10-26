@@ -1,11 +1,21 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
-import { INITIAL_CUSTOMERS, REPLAY_EVENTS, type CustomerNBA, type StreamEvent } from "@/data/mockData";
+import { REPLAY_EVENTS, type StreamEvent } from "@/data/mockData";
+import { DEFAULT_CUSTOMERS, POOL, POOL_BY_ID } from "@/data/pitchPool";
+import {
+  applyPolicy,
+  applyRetrain,
+  BASE_MODEL,
+  enforceProfiling,
+  pickSample,
+  type ModelState,
+  type PoolCustomer,
+} from "@/lib/pitch";
 
 export type Feedback = { customer_id: string; action: string; at: string; note?: string | undefined };
 
 interface Store {
-  customers: CustomerNBA[];
-  processed: Record<string, { before: CustomerNBA; after: CustomerNBA }>;
+  customers: PoolCustomer[];
+  processed: Record<string, { before: PoolCustomer; after: PoolCustomer }>;
   feedback: Feedback[];
   recentlyUpdated: string | null;
   selectedId: string;
@@ -13,13 +23,18 @@ interface Store {
   applyEvent: (evt: StreamEvent) => void;
   resetAll: () => void;
   logFeedback: (f: Omit<Feedback, "at">) => void;
+  sampleRandom: () => PoolCustomer[];
+  sampleIds: string[] | null;
+  model: ModelState;
+  retrain: () => void;
+  approvePolicy: () => void;
 }
 
 const Ctx = createContext<Store | null>(null);
 
 /** Pure state transition: applies a stream event to a customer. */
-export function applyEventToCustomer(c: CustomerNBA, evt: StreamEvent): CustomerNBA {
-  const next: CustomerNBA = {
+export function applyEventToCustomer(c: PoolCustomer, evt: StreamEvent): PoolCustomer {
+  const next: PoolCustomer = {
     ...c,
     churn_prob: evt.churn_after_event,
     current_nba: { ...evt.nba_after_event },
@@ -43,18 +58,22 @@ export function applyEventToCustomer(c: CustomerNBA, evt: StreamEvent): Customer
 }
 
 export function NbaProvider({ children }: { children: ReactNode }) {
-  const [customers, setCustomers] = useState<CustomerNBA[]>(INITIAL_CUSTOMERS);
+  const [customers, setCustomers] = useState<PoolCustomer[]>(DEFAULT_CUSTOMERS);
   const [processed, setProcessed] = useState<Store["processed"]>({});
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [recentlyUpdated, setRecentlyUpdated] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState(INITIAL_CUSTOMERS[0]?.customer_id ?? "");
+  const [selectedId, setSelectedId] = useState(DEFAULT_CUSTOMERS[0]?.customer_id ?? "");
+  const [model, setModel] = useState<ModelState>(BASE_MODEL);
+  const [sampleIds, setSampleIds] = useState<string[] | null>(null);
 
   const applyEvent = useCallback((evt: StreamEvent) => {
     setCustomers((prev) => {
-      const before = prev.find((c) => c.customer_id === evt.customer_id);
+      // Falls back to the pool baseline when the customer is not in the current random sample.
+      const before = prev.find((c) => c.customer_id === evt.customer_id) ?? POOL_BY_ID.get(evt.customer_id);
       if (!before) return prev;
-      const after = applyEventToCustomer(before, evt);
+      const after = enforceProfiling(applyEventToCustomer(before, evt));
       setProcessed((p) => ({ ...p, [evt.event_id]: { before, after } }));
+      if (!prev.some((c) => c.customer_id === evt.customer_id)) return prev;
       return prev.map((c) => (c.customer_id === evt.customer_id ? after : c));
     });
     setRecentlyUpdated(evt.customer_id);
@@ -62,17 +81,45 @@ export function NbaProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resetAll = useCallback(() => {
-    setCustomers(INITIAL_CUSTOMERS);
+    setCustomers(DEFAULT_CUSTOMERS);
     setProcessed({});
+    setSampleIds(null);
+    setSelectedId(DEFAULT_CUSTOMERS[0]?.customer_id ?? "");
+  }, []);
+
+  const sampleRandom = useCallback(() => {
+    const next = pickSample(POOL, 5);
+    setCustomers(next);
+    setSampleIds(next.map((c) => c.customer_id));
+    setSelectedId(next[0]?.customer_id ?? "");
+    return next;
   }, []);
 
   const logFeedback = useCallback((f: Omit<Feedback, "at">) => {
     setFeedback((prev) => [{ ...f, at: new Date().toLocaleTimeString("de-DE") }, ...prev]);
   }, []);
 
+  const retrain = useCallback(() => setModel((m) => (m.retrained ? m : applyRetrain(m))), []);
+  const approvePolicy = useCallback(() => setModel(applyPolicy), []);
+
   return (
     <Ctx.Provider
-      value={{ customers, processed, feedback, recentlyUpdated, selectedId, setSelectedId, applyEvent, resetAll, logFeedback }}
+      value={{
+        customers,
+        processed,
+        feedback,
+        recentlyUpdated,
+        selectedId,
+        setSelectedId,
+        applyEvent,
+        resetAll,
+        logFeedback,
+        sampleRandom,
+        sampleIds,
+        model,
+        retrain,
+        approvePolicy,
+      }}
     >
       {children}
     </Ctx.Provider>
