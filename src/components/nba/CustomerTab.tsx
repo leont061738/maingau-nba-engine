@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { MapPin, CalendarDays, Users, UserCheck, Info, ShieldAlert, Sparkles, Check, X, ThumbsUp, Zap, Smartphone, Flame, Car, MessageSquareQuote } from "lucide-react";
+import { MapPin, CalendarDays, Users, UserCheck, Info, ShieldAlert, Sparkles, Check, X, ThumbsUp, Zap, Smartphone, Flame, Car, MessageSquareQuote, Dices } from "lucide-react";
 import { useNba } from "@/lib/nba-store";
-import { ActionBadge, channelMeta, churnTone, eur } from "./shared";
+import { ActionBadge, channelMeta, churnTone, CustomerProfilingBadge, eur } from "./shared";
+import { profilingState } from "@/lib/pitch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -13,7 +14,7 @@ const lineIcon: Record<string, typeof Zap> = { Strom: Zap, Gas: Flame, Mobilfunk
 const contractName: Record<string, string> = { Strom: "StromKomfort", Gas: "GasKomfort", Mobilfunk: "Mobil S", Autostrom: "Autostrom Flex" };
 
 export function CustomerTab() {
-  const { customers, selectedId, setSelectedId, logFeedback, feedback, recentlyUpdated } = useNba();
+  const { customers, selectedId, setSelectedId, logFeedback, feedback, recentlyUpdated, sampleRandom, sampleIds } = useNba();
   const c = customers.find((x) => x.customer_id === selectedId) ?? customers[0]!;
   const nba = c.current_nba;
   const ch = channelMeta[nba.channel];
@@ -23,16 +24,22 @@ export function CustomerTab() {
   const household = (c.birth_year % 4) + 1;
   const serviceCost = c.has_open_complaint ? 184 : c.churn_drivers.some((d) => d.includes("Lad")) ? 96 : 32;
 
+  const profiling = profilingState(c);
   const consents = [
-    { k: "Email Marketing", v: c.consents.marketing_email },
-    { k: "Portal Personalisation", v: c.consents.portal_app },
-    { k: "Profiling / Analytics", v: c.consents.profiling },
-    { k: "Phone Contact", v: c.consents.phone },
+    { k: "Email Marketing", ok: c.consents.marketing_email, v: c.consents.marketing_email ? "Granted" : "Withdrawn" },
+    { k: "Portal Personalisation", ok: c.consents.portal_app, v: c.consents.portal_app ? "Granted" : "Withdrawn" },
+    { k: "Profiling / Analytics", ok: profiling === "granted", v: profiling === "granted" ? "Granted" : profiling === "withdrawn" ? "Withdrawn" : "Not Given" },
+    { k: "Phone Contact", ok: c.consents.phone, v: c.consents.phone ? "Granted" : "Withdrawn" },
   ];
 
   const act = (action: string, note?: string) => {
     logFeedback({ customer_id: c.customer_id, action, note });
     toast.success(`${action} logged`, { description: `${c.customer_id} · ${nba.product_name}` });
+  };
+
+  const sample = () => {
+    const next = sampleRandom();
+    toast.success("5 random customers sampled", { description: next.map((x) => x.customer_id).join(" · ") });
   };
 
   return (
@@ -50,6 +57,12 @@ export function CustomerTab() {
               ))}
             </SelectContent>
           </Select>
+          <Button size="sm" variant="secondary" onClick={sample}>
+            <Dices className="h-4 w-4" /> Sample 5 Random Customers
+          </Button>
+          {sampleIds && (
+            <span className="text-xs text-muted-foreground">Random sample active · {sampleIds.length} profiles</span>
+          )}
         </div>
 
         <div className={cn("rounded-xl border bg-card p-6 shadow-card", recentlyUpdated === c.customer_id && "flash-update")}>
@@ -114,8 +127,8 @@ export function CustomerTab() {
               {consents.map((x) => (
                 <div key={x.k} className="flex items-center justify-between rounded-lg bg-secondary px-3 py-2 text-sm">
                   <span>{x.k}</span>
-                  <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", x.v ? "bg-success text-success-foreground" : "bg-destructive text-destructive-foreground")}>
-                    {x.v ? "Granted" : "Withdrawn"}
+                  <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", x.ok ? "bg-success text-success-foreground" : "bg-destructive text-destructive-foreground")}>
+                    {x.v}
                   </span>
                 </div>
               ))}
@@ -132,8 +145,11 @@ export function CustomerTab() {
           </div>
 
           <div className={cn("relative overflow-hidden rounded-xl bg-gradient-navy p-6 text-navy-foreground shadow-glow", recentlyUpdated === c.customer_id && "flash-update")}>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-accent">
-              <Sparkles className="h-4 w-4" /> Next Best Action
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-accent">
+                <Sparkles className="h-4 w-4" /> Next Best Action
+              </div>
+              <CustomerProfilingBadge c={c} onDark />
             </div>
             <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
               <div>

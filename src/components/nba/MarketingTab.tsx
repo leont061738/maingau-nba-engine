@@ -1,10 +1,12 @@
 import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Euro, Users, PieChart, ShieldCheck, ShieldAlert, Send, Layers, ArrowRight } from "lucide-react";
+import { Euro, Users, PieChart, ShieldCheck, ShieldAlert, Send, Layers, ArrowRight, TrendingUp } from "lucide-react";
 import { useNba } from "@/lib/nba-store";
-import { ActionBadge, ChannelBadge, ComplianceBadge, eur, primarySegment } from "./shared";
+import { ActionBadge, ChannelBadge, ComplianceBadge, CustomerProfilingBadge, eur, primarySegment } from "./shared";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { HypothesisEngine } from "./HypothesisEngine";
+import { RetrainSimulator } from "./RetrainSimulator";
 import { cn } from "@/lib/utils";
 
 const LINES = ["All", "Strom", "Gas", "Mobilfunk", "Autostrom"];
@@ -34,7 +36,7 @@ function Seg({ value, options, onChange, label }: { value: string; options: stri
 }
 
 export function MarketingTab({ onOpenCustomer }: { onOpenCustomer: (id: string) => void }) {
-  const { customers, recentlyUpdated } = useNba();
+  const { customers, recentlyUpdated, model } = useNba();
   const [line, setLine] = useState("All");
   const [action, setAction] = useState("All");
   const [risk, setRisk] = useState("All");
@@ -64,7 +66,18 @@ export function MarketingTab({ onOpenCustomer }: { onOpenCustomer: (id: string) 
   ].map((b) => ({ ...b, items: customers.filter((c) => c.current_nba.channel === b.ch) }));
 
   const kpis = [
-    { label: "Total Potential Δ CLV", value: "€148,250", icon: Euro, hint: "Across synthetic pool" },
+    {
+      label: "Total Potential Δ CLV",
+      value: "€" + model.clv.toLocaleString("en-US"),
+      icon: Euro,
+      hint: model.retrained ? "Post re-training · +€14,150 vs. baseline" : "Across synthetic pool",
+    },
+    {
+      label: "Conversion Rate",
+      value: `${model.conversion.toFixed(1)}%`,
+      icon: TrendingUp,
+      hint: model.retrained ? "+2.8 pp vs. control group" : "Baseline · control-adjusted",
+    },
     { label: "Active Customers", value: "750", icon: Users, hint: "Synthetic pool" },
     { label: "Action Split", value: "42 / 35 / 23", icon: PieChart, hint: "Sales · Retention · Service %", split: true },
     { label: "Consent Compliance", value: "100%", icon: ShieldCheck, hint: "Strict GDPR enforcement" },
@@ -72,7 +85,7 @@ export function MarketingTab({ onOpenCustomer }: { onOpenCustomer: (id: string) 
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {kpis.map((k) => (
           <div key={k.label} className="rounded-xl border bg-card p-5 shadow-card">
             <div className="flex items-center justify-between">
@@ -91,6 +104,10 @@ export function MarketingTab({ onOpenCustomer }: { onOpenCustomer: (id: string) 
           </div>
         ))}
       </div>
+
+      <HypothesisEngine />
+
+      <RetrainSimulator />
 
       <div className="flex flex-wrap gap-6 rounded-xl border bg-card p-4 shadow-card">
         <Seg label="Business Line" value={line} options={LINES} onChange={setLine} />
@@ -136,7 +153,12 @@ export function MarketingTab({ onOpenCustomer }: { onOpenCustomer: (id: string) 
                         <td className="px-4 py-3"><ChannelBadge channel={c.current_nba.channel} /></td>
                         <td className="px-4 py-3 font-semibold">{c.current_nba.tone}</td>
                         <td className="whitespace-nowrap px-4 py-3 font-display font-bold text-success">+{eur(c.current_nba.delta_clv_eur)}</td>
-                        <td className="px-4 py-3"><ComplianceBadge blocked={c.current_nba.blocked_by_hard_rule} /></td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col items-start gap-1">
+                            <ComplianceBadge blocked={c.current_nba.blocked_by_hard_rule} />
+                            <CustomerProfilingBadge c={c} />
+                          </div>
+                        </td>
                         <td className="px-4 py-3">
                           <Button size="sm" variant="ghost" onClick={() => onOpenCustomer(c.customer_id)}>
                             360° <ArrowRight className="h-3.5 w-3.5" />
