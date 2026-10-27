@@ -2,7 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { MapPin, CalendarDays, Users, UserCheck, Info, ShieldAlert, Sparkles, Check, X, ThumbsUp, Zap, Smartphone, Flame, Car, MessageSquareQuote, Dices } from "lucide-react";
 import { useNba } from "@/lib/nba-store";
-import { ActionBadge, ChannelBadge, channelMeta, churnTone, CustomerProfilingBadge, eur } from "./shared";
+import { ActionBadge, ChannelBadge, churnTone, CustomerProfilingBadge, eur } from "./shared";
 import { profilingState } from "@/lib/pitch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,7 +20,6 @@ export function CustomerTab() {
   const c = customers.find((x) => x.customer_id === selectedId) ?? customers[0];
   if (!c) return <p>Keine Kunden verfügbar.</p>;
   const nba = c.current_nba;
-  const ch = channelMeta[nba.channel];
   const tone = churnTone(c.churn_prob);
 
   const household = (c.birth_year % 4) + 1;
