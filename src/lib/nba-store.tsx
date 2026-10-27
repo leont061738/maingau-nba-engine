@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 import { REPLAY_EVENTS, type StreamEvent } from "@/data/mockData";
 import { DEFAULT_CUSTOMERS, POOL, POOL_BY_ID } from "@/data/pitchPool";
 import {
+  BANDIT_DEFAULT_EXPLORATION,
+  type DecisionStatus,
   applyPolicy,
   applyRetrain,
   BASE_MODEL,
@@ -25,6 +27,10 @@ interface Store {
   logFeedback: (f: Omit<Feedback, "at">) => void;
   sampleRandom: () => PoolCustomer[];
   sampleIds: string[] | null;
+  exploration: number;
+  setExploration: (value: number) => void;
+  decisions: Record<string, DecisionStatus>;
+  resolveDecisions: (keys: string[], status: DecisionStatus) => void;
   model: ModelState;
   retrain: () => void;
   approvePolicy: () => void;
@@ -54,7 +60,7 @@ export function applyEventToCustomer(c: PoolCustomer, evt: StreamEvent): PoolCus
     next.churn_drivers = ["3 fehlgeschlagene Ladungen (14 Tage)"];
   }
   if (evt.event_type === "complaint_created") next.has_open_complaint = true;
-  return next;
+  return enforceProfiling(next);
 }
 
 export function NbaProvider({ children }: { children: ReactNode }) {
@@ -63,6 +69,9 @@ export function NbaProvider({ children }: { children: ReactNode }) {
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [recentlyUpdated, setRecentlyUpdated] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState(DEFAULT_CUSTOMERS[0]?.customer_id ?? "");
+  const [exploration, setExploration] = useState(BANDIT_DEFAULT_EXPLORATION);
+  const [decisions, setDecisions] = useState<Record<string, DecisionStatus>>({});
+  const resolveDecisions = (keys: string[], status: DecisionStatus) => setDecisions(prev => ({ ...prev, ...Object.fromEntries(keys.map(key => [key, status])) }));
   const [model, setModel] = useState<ModelState>(BASE_MODEL);
   const [sampleIds, setSampleIds] = useState<string[] | null>(null);
 
@@ -83,6 +92,7 @@ export function NbaProvider({ children }: { children: ReactNode }) {
   const resetAll = useCallback(() => {
     setCustomers(DEFAULT_CUSTOMERS);
     setProcessed({});
+    setDecisions({});
     setSampleIds(null);
     setSelectedId(DEFAULT_CUSTOMERS[0]?.customer_id ?? "");
   }, []);
@@ -92,7 +102,7 @@ export function NbaProvider({ children }: { children: ReactNode }) {
     setCustomers(next);
     setSampleIds(next.map((c) => c.customer_id));
     setSelectedId(next[0]?.customer_id ?? "");
-    return next;
+    return enforceProfiling(next);
   }, []);
 
   const logFeedback = useCallback((f: Omit<Feedback, "at">) => {
@@ -116,6 +126,7 @@ export function NbaProvider({ children }: { children: ReactNode }) {
         logFeedback,
         sampleRandom,
         sampleIds,
+        exploration, setExploration, decisions, resolveDecisions,
         model,
         retrain,
         approvePolicy,

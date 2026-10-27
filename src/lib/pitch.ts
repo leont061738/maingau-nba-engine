@@ -11,7 +11,7 @@ export interface PoolCustomer extends CustomerNBA {
 }
 
 export const PROFILING_FALLBACK_REASON =
-  "Personalization blocked due to missing profiling consent. Fallback applied.";
+  "Personalisierung wegen fehlender Profiling-Einwilligung gesperrt. Nicht personalisierte Alternative angewendet.";
 
 export function profilingState(c: PoolCustomer): ProfilingState {
   if (c.profiling_analytics) return c.profiling_analytics;
@@ -25,30 +25,32 @@ export function isProfilingBlocked(c: PoolCustomer) {
 const FALLBACKS: Record<NonNullable<PoolCustomer["fallback_kind"]>, CustomerNBA["current_nba"]> = {
   notice: {
     product_id: "P-STD-01",
-    product_name: "Unpersonalized Standard Service/Tariff Notice",
+    product_name: "Nicht personalisierter Service-/Tarifhinweis",
     action_type: "service",
     channel: "portal_popup",
     tone: "Sie",
-    tone_confidence: 100,
+    tone_confidence: 88,
     delta_clv_eur: 0,
     reason: PROFILING_FALLBACK_REASON,
-    blocked_by_hard_rule: "Profiling consent missing (Art. 6 GDPR) — personalized offers blocked",
+    blocked_by_hard_rule: "Profiling-Einwilligung fehlt (Art. 6 DSGVO) — personalisierte Angebote gesperrt",
   },
   no_action: {
     product_id: "P-NONE-00",
-    product_name: "No Action (Contact Fatigue Protected)",
+    product_name: "Keine Aktion (Kontaktschutz aktiv)",
     action_type: "service",
     channel: "portal_popup",
     tone: "Sie",
-    tone_confidence: 100,
+    tone_confidence: 88,
     delta_clv_eur: 0,
-    reason: `${PROFILING_FALLBACK_REASON} Contact fatigue rule (max 1 contact / 30 days) blocks any outbound marketing.`,
-    blocked_by_hard_rule: "Profiling consent missing (Art. 6 GDPR) — no action permitted",
+    reason: `${PROFILING_FALLBACK_REASON} Kontaktschutz (max. 1 Kontakt / 30 Tage) sperrt ausgehende Werbung.`,
+    blocked_by_hard_rule: "Profiling-Einwilligung fehlt (Art. 6 DSGVO) — keine Kontaktaufnahme zulässig",
   },
 };
 
 /** Compliance guard: no personalized/behavioral offer may survive for a customer without profiling consent. */
 export function enforceProfiling(c: PoolCustomer): PoolCustomer {
+  const score = confidenceFor(c.name, c.current_nba.tone_confidence);
+  if (score !== c.current_nba.tone_confidence) c = { ...c, current_nba: { ...c.current_nba, tone_confidence: score } };
   if (!isProfilingBlocked(c)) return c;
   const base = FALLBACKS[c.fallback_kind ?? "notice"];
   return {
@@ -77,22 +79,22 @@ export interface Hypothesis {
 export const HYPO_H104: Hypothesis = {
   id: "H-104",
   title:
-    "EV drivers with >3 public charges/month convert +22% higher to 'StromAktiv' when addressed in informal tone ('Du') via In-App Pop-up.",
+    "E-Auto-Fahrer mit >3 öffentlichen Ladungen/Monat wechseln bei Du-Ansprache per In-App-Pop-up mit +22% höherer Wahrscheinlichkeit zu StromAktiv.",
   sample: 120,
   uplift: 18.4,
   significance: 96,
-  status: "Confirmed & Integrated",
+  status: "Bestätigt & integriert",
   confirmed: true,
 };
 
 export const HYPO_H105: Hypothesis = {
   id: "H-105",
   title:
-    "Prosumers with feed-in meters adopt HEMS Starter-Set faster when offered an annual SaaS discount instead of a hardware discount.",
+    "Prosumer mit Einspeisezähler entscheiden sich schneller für das HEMS Starter-Set, wenn sie einen jährlichen SaaS-Rabatt statt eines Hardware-Rabatts erhalten.",
   sample: 45,
   uplift: 6.2,
   significance: 78,
-  status: "Running (Exploration Phase)",
+  status: "Laufend (Explorationsphase)",
   confirmed: false,
 };
 
@@ -119,10 +121,10 @@ export const CONVERSION_GAIN_PP = 2.8;
 export const BANDIT_DEFAULT_EXPLORATION = 10;
 
 export const RETRAIN_STEPS = [
-  "Collecting conversion events...",
-  "Evaluating Uplift vs. Control Group...",
-  "Re-calculating p(accept) in CLV model...",
-  "Re-training Decision Policies...",
+  "Konvertierungsereignisse sammeln…",
+  "Mehrertrag gegenüber Kontrollgruppe prüfen…",
+  "Annahmewahrscheinlichkeit im CLV-Modell neu berechnen…",
+  "Entscheidungsregeln neu trainieren…",
 ];
 
 export function applyRetrain(m: ModelState): ModelState {
@@ -131,7 +133,7 @@ export function applyRetrain(m: ModelState): ModelState {
     clv: RETRAINED_CLV,
     conversion: Math.round((m.conversion + CONVERSION_GAIN_PP) * 10) / 10,
     retrained: true,
-    h105: { ...m.h105, sample: m.h105.sample + 50, uplift: 8.4, significance: 93, status: "Validated", confirmed: true },
+    h105: { ...m.h105, sample: m.h105.sample + 50, uplift: 8.4, significance: 93, status: "Validiert", confirmed: true },
   };
 }
 
@@ -145,8 +147,10 @@ export function shuffle<T>(arr: readonly T[], rng: () => number): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
-    const tmp = a[i]!;
-    a[i] = a[j]!;
+    const tmp = a[i];
+    const other = a[j];
+    if (tmp === undefined || other === undefined) continue;
+    a[i] = other;
     a[j] = tmp;
   }
   return a;
@@ -166,4 +170,29 @@ export function pickSample(pool: readonly PoolCustomer[], size = 5, rng: () => n
   for (const c of shuffle(restricted, rng)) push(c);
   for (const c of shuffle(rest, rng)) push(c);
   return out;
+}
+
+/** Prototype anchors; retain the retraining gain while applying exploration cost. */
+export function explorationMetrics(exploration: number, baseline = BASE_MODEL.clv) {
+  const share = Math.max(0, Math.min(50, exploration));
+  const adjustment = share <= 10 ? (10 - share) * 590 : -(share - 10) * 457.5;
+  return { clv: Math.round(baseline + adjustment), cost: Math.round(-adjustment), learningGain: Math.round(Math.max(0, share - 10) * 1.75) };
+}
+
+export function confidenceFor(name: string, score: number) {
+  const scores: Record<string, number> = { "Laura Schmidt": 88, "Maximilian Weber": 91, "Sarah Lindemann": 84, "Dr. Klaus Hoffmann": 93 };
+  return scores[name] ?? Math.max(82, Math.min(94, Number.isFinite(score) ? Math.round(score) : 88));
+}
+
+export type DecisionStatus = "approved" | "rejected";
+export function decisionKey(c: PoolCustomer) {
+  const n = c.current_nba;
+  return [c.customer_id, n.product_id, n.channel, n.delta_clv_eur, n.reason].join("|");
+}
+export function pendingDecisions(customers: PoolCustomer[], resolved: Record<string, DecisionStatus>) {
+  return customers.map(enforceProfiling).filter(c => c.current_nba.product_id !== "P-NONE-00" && !resolved[decisionKey(c)]);
+}
+export function selectionSummary(customers: PoolCustomer[], keys: string[]) {
+  const selected = customers.filter(c => keys.includes(decisionKey(c)));
+  return { selected, count: selected.length, profit: selected.reduce((sum, c) => sum + c.current_nba.delta_clv_eur, 0), channels: new Set(selected.map(c => c.current_nba.channel)).size };
 }
