@@ -2,7 +2,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { MapPin, CalendarDays, Users, UserCheck, Info, ShieldAlert, Sparkles, Check, X, ThumbsUp, Zap, Smartphone, Flame, Car, MessageSquareQuote, Dices } from "lucide-react";
 import { useNba } from "@/lib/nba-store";
-import { ActionBadge, channelMeta, churnTone, CustomerProfilingBadge, eur } from "./shared";
+import { ActionBadge, ChannelBadge, channelMeta, churnTone, CustomerProfilingBadge, eur } from "./shared";
 import { profilingState } from "@/lib/pitch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -165,7 +165,7 @@ export function CustomerTab() {
               </div>
             </div>
             <div className="mt-5 inline-flex flex-wrap items-center gap-2 rounded-full border border-navy-muted/30 px-4 py-1.5 text-sm">
-              <ch.icon className="h-4 w-4 text-accent" /> Kanal: <b>{ch.label}</b>
+              Kanal: <ChannelBadge channel={nba.channel} />
               <span className="text-navy-muted">|</span> Tonalität: <b>{nba.tone}</b>
               <span className="text-navy-muted">({nba.tone_confidence}% NLP-Konfidenz)</span>
             </div>

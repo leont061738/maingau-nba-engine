@@ -50,7 +50,9 @@ const FALLBACKS: Record<NonNullable<PoolCustomer["fallback_kind"]>, CustomerNBA[
 /** Compliance guard: no personalized/behavioral offer may survive for a customer without profiling consent. */
 export function enforceProfiling(c: PoolCustomer): PoolCustomer {
   const score = confidenceFor(c.name, c.current_nba.tone_confidence);
-  if (score !== c.current_nba.tone_confidence) c = { ...c, current_nba: { ...c.current_nba, tone_confidence: score } };
+  const reason = c.current_nba.reason.replaceAll("Churn-Prävention", "Abwanderungsprävention").replaceAll("Retention", "Kundenbindung").replaceAll("Churn", "Abwanderung").replaceAll("Cross-Sell", "Zusatzangebot").replaceAll("E-Mail-Consent", "E-Mail-Einwilligung");
+  const blocked = c.current_nba.blocked_by_hard_rule?.replaceAll("Sales geblockt", "Vertrieb gesperrt").replaceAll("Dunning Level", "Mahnstufe");
+  if (score !== c.current_nba.tone_confidence || reason !== c.current_nba.reason || blocked !== c.current_nba.blocked_by_hard_rule) c = { ...c, current_nba: { ...c.current_nba, tone_confidence: score, reason, ...(blocked ? { blocked_by_hard_rule: blocked } : {}) } };
   if (!isProfilingBlocked(c)) return c;
   const base = FALLBACKS[c.fallback_kind ?? "notice"];
   return {

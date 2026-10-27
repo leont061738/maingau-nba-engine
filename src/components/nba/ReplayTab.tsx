@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { useNba, REPLAY_EVENTS } from "@/lib/nba-store";
 import { POOL_BY_ID } from "@/data/pitchPool";
 import type { CustomerNBA, StreamEvent } from "@/data/mockData";
-import { ActionBadge, channelMeta, eur } from "./shared";
+import { ActionBadge, ChannelBadge, eur } from "./shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -18,14 +18,13 @@ const STEPS = [
 
 function Side({ title, c, highlight }: { title: string; c: CustomerNBA; highlight?: boolean }) {
   const n = c.current_nba;
-  const Ch = channelMeta[n.channel].icon;
   return (
     <div className={cn("flex-1 rounded-lg border p-4", highlight ? "border-accent bg-accent/10" : "bg-secondary")}>
       <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</div>
       <div className="mt-2 font-semibold">{n.product_name}</div>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
         <ActionBadge type={n.action_type} />
-        <span className="inline-flex items-center gap-1"><Ch className="h-3.5 w-3.5" />{channelMeta[n.channel].label}</span>
+        <ChannelBadge channel={n.channel} />
         <span>· {n.tone}</span>
       </div>
       <div className="mt-2 text-xs text-muted-foreground">Abwanderungsrisiko {Math.round(c.churn_prob * 100)}% · Δ CLV +{eur(n.delta_clv_eur)}</div>
@@ -107,8 +106,8 @@ export function ReplayTab({ onOpenCustomer }: { onOpenCustomer: (id: string) => 
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{evt.description}</p>
-                    <p className="mt-1 text-sm font-medium">{evt.impact_description}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{evt.description.replace("Kunde klickt im Newsletter-Footer auf 'Abmelden' (marketing_email -> withdrawn).", "Kunde widerruft die E-Mail-Einwilligung über den Abmeldelink im Newsletter.")}</p>
+                    <p className="mt-1 text-sm font-medium">{evt.impact_description.replaceAll("Churn", "Abwanderung")}</p>
                   </div>
                   <Button
                     disabled={!!running || !!done}
