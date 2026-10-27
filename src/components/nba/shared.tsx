@@ -26,7 +26,7 @@ export function ChannelBadge({ channel }: { channel: Nba["channel"] }) {
   const m = channelMeta[channel];
   const Icon = m.icon;
   return (
-    <span className=cn("inline-flex whitespace-nowrap items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium", channel === "app_push" ? "bg-push/10 text-push border-push/30" : "bg-secondary")>
+    <span className={cn("inline-flex whitespace-nowrap items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium", channel === "app_push" ? "bg-push/10 text-push border-push/30" : "bg-secondary")}>
       <Icon className="h-3.5 w-3.5" /> {m.label}
     </span>
   );

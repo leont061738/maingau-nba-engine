@@ -144,7 +144,7 @@ export function ReplayTab({ onOpenCustomer }: { onOpenCustomer: (id: string) => 
             <RefreshCw className={cn("h-3.5 w-3.5", running && "animate-spin text-accent")} /> Echtzeit-Verarbeitungsprotokoll
           </div>
           <div className="min-h-64 space-y-1.5">
-            {log.length === 0 && <div className="text-navy-muted">Waiting for events… press "Ereignis abspielen".</div>}
+            {log.length === 0 && <div className="text-navy-muted">Warten auf Ereignisse…</div>}
             {log.map((l, i) => (
               <div key={i} className={cn("animate-in fade-in slide-in-from-left-1", l === "Entscheidung aktualisiert!" ? "text-success" : i === 0 ? "text-accent" : "")}>
                 <span className="text-navy-muted">›</span> {l}
