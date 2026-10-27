@@ -102,7 +102,7 @@ export function NbaProvider({ children }: { children: ReactNode }) {
     setCustomers(next);
     setSampleIds(next.map((c) => c.customer_id));
     setSelectedId(next[0]?.customer_id ?? "");
-    return enforceProfiling(next);
+    return next;
   }, []);
 
   const logFeedback = useCallback((f: Omit<Feedback, "at">) => {

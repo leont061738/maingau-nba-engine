@@ -110,7 +110,7 @@ export function RetrainSimulator() {
                 <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Hypothese H-105</div>
                 <div className="font-display text-xl font-bold">{model.h105.status}</div>
                 <div className="text-[11px] text-muted-foreground">
-                  {model.h105.sample} Kunden · {model.h105.Signifikanz}% Signifikanz
+                  {model.h105.sample} Kunden · {model.h105.significance}% Signifikanz
                 </div>
               </div>
             </div>
