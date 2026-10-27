@@ -25,14 +25,14 @@ const EXTRA: PoolCustomer[] = [
     fallback_kind: "notice",
     current_nba: {
       product_id: "P-STD-01",
-      product_name: "Unpersonalized Standard Service/Tariff Notice",
+      product_name: "Nicht personalisierter Service-/Tarifhinweis",
       action_type: "service",
       channel: "portal_popup",
       tone: "Du",
-      tone_confidence: 100,
+      tone_confidence: 88,
       delta_clv_eur: 0,
-      reason: "Personalization blocked due to missing profiling consent. Fallback applied.",
-      blocked_by_hard_rule: "Profiling consent missing (Art. 6 GDPR) — personalized offers blocked",
+      reason: "Personalisierung wegen fehlender Profiling-Einwilligung gesperrt. Nicht personalisierte Alternative angewendet.",
+      blocked_by_hard_rule: "Profiling-Einwilligung fehlt (Art. 6 DSGVO) — personalisierte Angebote gesperrt",
     },
   },
   {
@@ -52,15 +52,15 @@ const EXTRA: PoolCustomer[] = [
     fallback_kind: "no_action",
     current_nba: {
       product_id: "P-NONE-00",
-      product_name: "No Action (Contact Fatigue Protected)",
+      product_name: "Keine Aktion (Kontaktschutz aktiv)",
       action_type: "service",
       channel: "portal_popup",
       tone: "Sie",
-      tone_confidence: 100,
+      tone_confidence: 88,
       delta_clv_eur: 0,
       reason:
-        "Personalization blocked due to missing profiling consent. Fallback applied. Contact fatigue rule (max 1 contact / 30 days) blocks any outbound marketing.",
-      blocked_by_hard_rule: "Profiling consent missing (Art. 6 GDPR) — no action permitted",
+        "Personalisierung wegen fehlender Profiling-Einwilligung gesperrt. Nicht personalisierte Alternative angewendet. Kontaktschutz (max. 1 Kontakt / 30 Tage) sperrt ausgehende Werbung.",
+      blocked_by_hard_rule: "Profiling-Einwilligung fehlt (Art. 6 DSGVO) — keine Kontaktaufnahme zulässig",
     },
   },
   {
@@ -83,10 +83,10 @@ const EXTRA: PoolCustomer[] = [
       action_type: "service",
       channel: "agent_phone",
       tone: "Sie",
-      tone_confidence: 97,
+      tone_confidence: 92,
       delta_clv_eur: 140,
       reason: "Mahnstufe 3 aktiv. Vertrieb hart gesperrt — Klärung der offenen Forderung vor jeder Ausspielung.",
-      blocked_by_hard_rule: "Sales geblockt: Dunning Level 3.",
+      blocked_by_hard_rule: "Vertrieb gesperrt: Mahnstufe 3.",
     },
   },
   {
@@ -206,20 +206,29 @@ const EXTRA: PoolCustomer[] = [
     fallback_kind: "notice",
     current_nba: {
       product_id: "P-STD-01",
-      product_name: "Unpersonalized Standard Service/Tariff Notice",
+      product_name: "Nicht personalisierter Service-/Tarifhinweis",
       action_type: "service",
       channel: "portal_popup",
       tone: "Du",
-      tone_confidence: 100,
+      tone_confidence: 88,
       delta_clv_eur: 0,
-      reason: "Personalization blocked due to missing profiling consent. Fallback applied.",
-      blocked_by_hard_rule: "Profiling consent missing (Art. 6 GDPR) — personalized offers blocked",
+      reason: "Personalisierung wegen fehlender Profiling-Einwilligung gesperrt. Nicht personalisierte Alternative angewendet.",
+      blocked_by_hard_rule: "Profiling-Einwilligung fehlt (Art. 6 DSGVO) — personalisierte Angebote gesperrt",
     },
   },
 ];
 
 /** Full pool, already passed through the profiling compliance guard. */
-export const POOL: PoolCustomer[] = [...BASE, ...EXTRA].map(enforceProfiling);
+export const POOL: PoolCustomer[] = [...BASE, ...EXTRA].map(c => enforceProfiling({
+  ...c,
+  churn_drivers: c.churn_drivers.map(d => d.replace("Multi-Product", "Mehrproduktkunde")),
+  current_nba: {
+    ...c.current_nba,
+    ...(c.name === "Elena Rostova" || c.name === "Sofia Petrova" ? { channel: "app_push" as const } : {}),
+    reason: c.current_nba.reason.replace("Churn-Prävention", "Abwanderungsprävention").replace("Retention", "Kundenbindung").replace("Churn", "Abwanderung").replace("Cross-Sell", "Zusatzangebot").replace("E-Mail-Consent", "E-Mail-Einwilligung").replace("Upsell", "Tarifaufwertung").replace("daher Portal-Hinweis", "daher App-Push-Hinweis"),
+    ...(c.current_nba.blocked_by_hard_rule ? { blocked_by_hard_rule: c.current_nba.blocked_by_hard_rule.replace("Sales geblockt", "Vertrieb gesperrt").replace("Dunning Level", "Mahnstufe") } : {}),
+  },
+}));
 
 /** The pool the demo starts with (the original six profiles from mockData). */
 export const DEFAULT_CUSTOMERS: PoolCustomer[] = POOL.slice(0, BASE.length);

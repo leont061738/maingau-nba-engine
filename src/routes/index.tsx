@@ -13,10 +13,10 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "MAINGAU NBA Engine · Next Best Action Prototype" },
-      { name: "description", content: "Next Best Action engine prototype for MAINGAU Energie: campaign orchestration, Customer 360° agent assist and live event replay." },
+      { title: "MAINGAU NBA Engine · Prototyp für nächste beste Aktionen" },
+      { name: "description", content: "MAINGAU Energie: Marketing-Orchestrierung, Kunden 360°, Agenten-Assist und Echtzeit Event-Replay mit konsequenter Einwilligungsprüfung." },
       { property: "og:title", content: "MAINGAU NBA Engine" },
-      { property: "og:description", content: "Real-time Next Best Action decisions by offer, channel and tone — consent-first." },
+      { property: "og:description", content: "NBA-Entscheidungen in Echtzeit: Angebot, Kanal und Tonalität mit konsequenter Einwilligungsprüfung." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -26,9 +26,9 @@ export const Route = createFileRoute("/")({
 
 type Tab = "marketing" | "customer" | "replay";
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
-  { id: "marketing", label: "Marketing Orchestration", icon: LayoutDashboard },
-  { id: "customer", label: "Customer 360° / Agent Assist", icon: UserRound },
-  { id: "replay", label: "Event Stream Replay (Deep Dive B)", icon: RefreshCw },
+  { id: "marketing", label: "Marketing-Orchestrierung", icon: LayoutDashboard },
+  { id: "customer", label: "Kunden 360° / Agenten-Assist", icon: UserRound },
+  { id: "replay", label: "Echtzeit Event-Replay (Deep Dive B)", icon: RefreshCw },
 ];
 
 function Shell() {
@@ -37,7 +37,7 @@ function Shell() {
   const open = (id: string) => { setSelectedId(id); setTab("customer"); };
   const sample = () => {
     const next = sampleRandom();
-    toast.success("5 random customers sampled", { description: next.map((c) => c.customer_id).join(" · ") });
+    toast.success("5 zufällige Kunden ausgewählt", { description: next.map((c) => c.customer_id).join(" · ") });
   };
 
   return (
@@ -52,25 +52,25 @@ function Shell() {
           </div>
           <div className="flex items-center gap-4">
             <Button size="sm" onClick={sample} className="bg-gradient-amber font-semibold text-accent-foreground hover:opacity-90">
-              <Dices className="h-4 w-4" /> Sample 5 Random Customers
+              <Dices className="h-4 w-4" /> 5 zufällige Kunden auswählen
             </Button>
             <span className="flex items-center gap-2 text-xs text-navy-muted">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-success" /> Stream live · {Object.keys(processed).length} events applied
+              <span className="h-2 w-2 animate-pulse rounded-full bg-success" /> Ereignisstrom aktiv · {Object.keys(processed).length} Ereignisse angewendet
             </span>
           </div>
         </div>
         <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-6">
           {TABS.map((t) => (
-            <button
+            <Button variant="ghost"
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                "flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition",
+                "h-auto rounded-none flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition hover:bg-navy-foreground/5",
                 tab === t.id ? "border-accent text-navy-foreground" : "border-transparent text-navy-muted hover:text-navy-foreground",
               )}
             >
               <t.icon className="h-4 w-4" /> {t.label}
-            </button>
+            </Button>
           ))}
         </nav>
       </header>

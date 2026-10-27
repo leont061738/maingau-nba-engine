@@ -1,239 +1,101 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Euro, Users, PieChart, ShieldCheck, ShieldAlert, Send, Layers, ArrowRight, TrendingUp } from "lucide-react";
+import { Euro, Users, PieChart, ShieldCheck, ShieldAlert, Send, Layers, ExternalLink, TrendingUp, X } from "lucide-react";
 import { useNba } from "@/lib/nba-store";
-import { ActionBadge, ChannelBadge, ComplianceBadge, CustomerProfilingBadge, eur, primarySegment } from "./shared";
+import { decisionKey, explorationMetrics, pendingDecisions, selectionSummary } from "@/lib/pitch";
+import { ActionBadge, ChannelBadge, ComplianceBadge, CustomerProfilingBadge, eur, primarySegment, channelMeta } from "./shared";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { HypothesisEngine } from "./HypothesisEngine";
 import { RetrainSimulator } from "./RetrainSimulator";
 import { cn } from "@/lib/utils";
 
-const LINES = ["All", "Strom", "Gas", "Mobilfunk", "Autostrom"];
-const ACTIONS = ["All", "Sales", "Retention", "Service-Only"];
-const RISK = ["All", "No Dunning", "Dunning / Complaint"];
-
 function Seg({ value, options, onChange, label }: { value: string; options: string[]; onChange: (v: string) => void; label: string }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
-      <div className="flex flex-wrap gap-1 rounded-lg bg-secondary p-1">
-        {options.map((o) => (
-          <button
-            key={o}
-            onClick={() => onChange(o)}
-            className={cn(
-              "rounded-md px-3 py-1.5 text-xs font-medium transition",
-              value === o ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {o}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+  return <div className="flex flex-col gap-1.5"><span className="text-[11px] font-semibold uppercase text-muted-foreground">{label}</span><div className="flex flex-wrap gap-1 rounded-lg bg-secondary p-1">{options.map(o => <Button key={o} size="sm" variant={value === o ? "default" : "ghost"} onClick={() => onChange(o)} aria-pressed={value === o}>{o}</Button>)}</div></div>;
+}
+
+function AnimatedProfit({ value }: { value: number }) {
+  const [display, setDisplay] = useState(value);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setDisplay(value); return; }
+    const from = display;
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => { const progress = Math.min(1, (now - start) / 250); setDisplay(Math.round(from + (value - from) * progress)); if (progress < 1) frame = requestAnimationFrame(tick); };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return <span>{eur(display)}</span>;
 }
 
 export function MarketingTab({ onOpenCustomer }: { onOpenCustomer: (id: string) => void }) {
-  const { customers, recentlyUpdated, model } = useNba();
-  const [line, setLine] = useState("All");
-  const [action, setAction] = useState("All");
-  const [risk, setRisk] = useState("All");
+  const { customers, recentlyUpdated, model, exploration, decisions, resolveDecisions } = useNba();
+  const [line, setLine] = useState("Alle");
+  const [action, setAction] = useState("Alle");
+  const [risk, setRisk] = useState("Alle");
+  const [channel, setChannel] = useState("Alle");
   const [fatigue, setFatigue] = useState(true);
-  const [approved, setApproved] = useState<string[]>([]);
-
-  const rows = useMemo(
-    () =>
-      customers.filter((c) => {
-        if (line !== "All" && !c.active_lines.includes(line)) return false;
-        const t = c.current_nba.action_type;
-        if (action === "Sales" && !(t === "sales" || t === "upsell")) return false;
-        if (action === "Retention" && t !== "retention") return false;
-        if (action === "Service-Only" && t !== "service") return false;
-        const risky = c.dunning_level > 0 || c.has_open_complaint;
-        if (risk === "No Dunning" && risky) return false;
-        if (risk === "Dunning / Complaint" && !risky) return false;
-        return true;
-      }),
-    [customers, line, action, risk],
-  );
-
-  const batches = [
-    { id: "B-EMAIL", name: "E-Mail Batch · ESP", ch: "email" as const },
-    { id: "B-PORTAL", name: "Portal Pop-up · Portal API", ch: "portal_popup" as const },
-    { id: "B-AGENT", name: "Service Call Queue · CRM", ch: "agent_phone" as const },
-  ].map((b) => ({ ...b, items: customers.filter((c) => c.current_nba.channel === b.ch) }));
-
+  const [selected, setSelected] = useState<string[]>([]);
+  const financial = explorationMetrics(exploration, model.clv);
+  const rows = useMemo(() => customers.filter(c => {
+    if (line !== "Alle" && !c.active_lines.includes(line)) return false;
+    const t = c.current_nba.action_type;
+    if (action === "Vertrieb" && t !== "sales" && t !== "upsell") return false;
+    if (action === "Bindung" && t !== "retention") return false;
+    if (action === "Nur Service" && t !== "service") return false;
+    const risky = c.dunning_level > 0 || c.has_open_complaint;
+    if (risk === "Ohne Risiko" && risky) return false;
+    if (risk === "Mahnung / Beschwerde" && !risky) return false;
+    return channel === "Alle" || channelMeta[c.current_nba.channel].label === channel;
+  }), [customers, line, action, risk, channel]);
+  const pending = pendingDecisions(customers, decisions);
+  const summary = selectionSummary(pending, selected);
+  const allChecked = pending.length > 0 && summary.count === pending.length;
+  const resolve = (status: "approved" | "rejected") => {
+    if (!summary.count) return;
+    resolveDecisions(summary.selected.map(decisionKey), status);
+    setSelected([]);
+    if (status === "rejected") { toast("Ausgewählte Aktionen abgelehnt", { description: `${summary.count} Entscheidungen verworfen.` }); return; }
+    toast.success("Ausgewählte Aktionen freigegeben", { description: `Demo-Übergabe: ${summary.count} Aktionen über ${summary.channels} Kanäle · ${fatigue ? "Kontaktschutz 1/30 Tage aktiviert" : "Kontaktschutz deaktiviert"}. Kein echter Versand.` });
+    if (summary.selected.some(c => c.current_nba.channel === "app_push")) toast.success("Erfolgreich an das MAINGAU App-Push-Gateway übermittelt", { description: "Simulierte Übergabe im Prototyp — kein echter Versand." });
+  };
   const kpis = [
-    {
-      label: "Total Potential Δ CLV",
-      value: "€" + model.clv.toLocaleString("en-US"),
-      icon: Euro,
-      hint: model.retrained ? "Post re-training · +€14,150 vs. baseline" : "Across synthetic pool",
-    },
-    {
-      label: "Conversion Rate",
-      value: `${model.conversion.toFixed(1)}%`,
-      icon: TrendingUp,
-      hint: model.retrained ? "+2.8 pp vs. control group" : "Baseline · control-adjusted",
-    },
-    { label: "Active Customers", value: "750", icon: Users, hint: "Synthetic pool" },
-    { label: "Action Split", value: "42 / 35 / 23", icon: PieChart, hint: "Sales · Retention · Service %", split: true },
-    { label: "Consent Compliance", value: "100%", icon: ShieldCheck, hint: "Strict GDPR enforcement" },
+    { label: "Gesamter erwarteter CLV-Zuwachs (ΔCLV)", value: <AnimatedProfit value={financial.clv} />, icon: Euro, hint: model.retrained ? "Nach Neutraining · explorationsbereinigt" : "Explorationsbereinigter Testpool" },
+    { label: "Konvertierungsrate (Kontrollgruppen-bereinigt)", value: `${model.conversion.toLocaleString("de-DE", { minimumFractionDigits: 1 })}%`, icon: TrendingUp, hint: model.retrained ? "+2,8 Prozentpunkte gegenüber Kontrollgruppe" : "Kontrollgruppen-bereinigte Basis" },
+    { label: "Aktive Testkunden", value: "750", icon: Users, hint: "Synthetischer Testpool" },
+    { label: "Aktions-Aufteilung (Vertrieb / Bindung / Service)", value: "42 / 35 / 23", icon: PieChart, hint: "Vertrieb · Bindung · Service %" },
+    { label: "DSGVO-Compliance", value: "100%", icon: ShieldCheck, hint: "Konsequente Einwilligungsprüfung" },
   ];
-
-  return (
-    <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {kpis.map((k) => (
-          <div key={k.label} className="rounded-xl border bg-card p-5 shadow-card">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{k.label}</span>
-              <k.icon className="h-4 w-4 text-accent" />
-            </div>
-            <div className="mt-2 font-display text-3xl font-bold tracking-tight">{k.value}</div>
-            {k.split ? (
-              <div className="mt-3 flex h-2 overflow-hidden rounded-full">
-                <div className="bg-chart-2" style={{ width: "42%" }} />
-                <div className="bg-accent" style={{ width: "35%" }} />
-                <div className="bg-destructive" style={{ width: "23%" }} />
-              </div>
-            ) : null}
-            <div className="mt-2 text-xs text-muted-foreground">{k.hint}</div>
-          </div>
-        ))}
-      </div>
-
-      <HypothesisEngine />
-
-      <RetrainSimulator />
-
-      <div className="flex flex-wrap gap-6 rounded-xl border bg-card p-4 shadow-card">
-        <Seg label="Business Line" value={line} options={LINES} onChange={setLine} />
-        <Seg label="Action Type" value={action} options={ACTIONS} onChange={setAction} />
-        <Seg label="Dunning / Risk" value={risk} options={RISK} onChange={setRisk} />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
-        <div className="overflow-hidden rounded-xl border bg-card shadow-card">
-          <div className="flex items-center justify-between border-b px-5 py-4">
-            <h3 className="font-semibold">Campaign Matrix</h3>
-            <span className="text-xs text-muted-foreground">{rows.length} of {customers.length} customers</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-secondary text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  {["Customer", "City", "Segment", "Recommended Action", "Channel", "Tone", "Δ CLV", "Compliance", ""].map((h) => (
-                    <th key={h} className="whitespace-nowrap px-4 py-3 font-semibold">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((c) => {
-                  const flagged = c.customer_id === "MG-100004" || !!c.current_nba.blocked_by_hard_rule;
-                  return (
-                    <Fragment key={c.customer_id}>
-                      <tr
-                        key={c.customer_id}
-                        className={cn(
-                          "border-t align-top transition",
-                          flagged && "border-l-4 border-l-warning bg-warning/10",
-                          recentlyUpdated === c.customer_id && "flash-update",
-                        )}
-                      >
-                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs font-semibold">{c.customer_id}</td>
-                        <td className="px-4 py-3">{c.city}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{primarySegment(c)}</td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium">{c.current_nba.product_name}</div>
-                          <div className="mt-1"><ActionBadge type={c.current_nba.action_type} /></div>
-                        </td>
-                        <td className="px-4 py-3"><ChannelBadge channel={c.current_nba.channel} /></td>
-                        <td className="px-4 py-3 font-semibold">{c.current_nba.tone}</td>
-                        <td className="whitespace-nowrap px-4 py-3 font-display font-bold text-success">+{eur(c.current_nba.delta_clv_eur)}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col items-start gap-1">
-                            <ComplianceBadge blocked={c.current_nba.blocked_by_hard_rule} />
-                            <CustomerProfilingBadge c={c} />
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Button size="sm" variant="ghost" onClick={() => onOpenCustomer(c.customer_id)}>
-                            360° <ArrowRight className="h-3.5 w-3.5" />
-                          </Button>
-                        </td>
-                      </tr>
-                      {flagged && (
-                        <tr key={c.customer_id + "-warn"} className="border-l-4 border-l-warning bg-warning/10">
-                          <td colSpan={9} className="px-4 pb-3 text-xs font-medium text-warning-foreground">
-                            <ShieldAlert className="mr-1 inline h-3.5 w-3.5" />
-                            {c.customer_id === "MG-100004"
-                              ? "Blocked: Open Complaint & Dunning 2 -> Service Action Enforced"
-                              : `Blocked: ${c.current_nba.blocked_by_hard_rule} -> Service Action Enforced`}
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-                {rows.length === 0 && (
-                  <tr><td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">No customers match these filters.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="h-fit rounded-xl border bg-card shadow-card">
-          <div className="rounded-t-xl bg-gradient-navy px-5 py-4 text-navy-foreground">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-accent">
-              <Layers className="h-4 w-4" /> Campaign Governance
-            </div>
-            <h3 className="mt-1 font-semibold">Human-in-the-loop Approval</h3>
-          </div>
-          <div className="space-y-4 p-5">
-            <div className="flex items-start justify-between gap-3 rounded-lg border p-3">
-              <div>
-                <div className="text-sm font-semibold">Contact fatigue rule</div>
-                <div className="text-xs text-muted-foreground">Max 1 contact per 30 days per customer</div>
-              </div>
-              <Switch checked={fatigue} onCheckedChange={setFatigue} />
-            </div>
-            <div className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Queued batches</div>
-              {batches.map((b) => (
-                <div key={b.id} className="flex items-center justify-between rounded-lg bg-secondary px-3 py-2.5 text-sm">
-                  <div>
-                    <div className="font-medium">{b.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {b.items.length} contacts · +{eur(b.items.reduce((s, c) => s + c.current_nba.delta_clv_eur, 0))}
-                    </div>
-                  </div>
-                  {approved.includes(b.id) ? (
-                    <span className="text-xs font-semibold text-success">Pushed</span>
-                  ) : (
-                    <span className="text-xs font-semibold text-muted-foreground">Pending</span>
-                  )}
-                </div>
-              ))}
-            </div>
-            <Button
-              className="w-full bg-gradient-amber font-semibold text-accent-foreground hover:opacity-90"
-              onClick={() => {
-                setApproved(batches.map((b) => b.id));
-                const n = batches.reduce((s, b) => s + b.items.length, 0);
-                toast.success("Batches approved & pushed", {
-                  description: `${n} contacts sent to ESP / Portal API${fatigue ? " · fatigue rule applied (1/30d)" : ""}.`,
-                });
-              }}
-            >
-              <Send className="h-4 w-4" /> Approve & Push to ESP / Portal API
-            </Button>
-          </div>
-        </div>
-      </div>
+  return <div className="space-y-6">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">{kpis.map(k => <div key={k.label} className="rounded-lg border bg-card p-5 shadow-card"><div className="flex items-start justify-between gap-2"><span className="min-h-12 text-xs font-semibold uppercase text-muted-foreground">{k.label}</span><k.icon className="h-4 w-4 shrink-0 text-accent" /></div><div className="mt-2 font-display text-2xl font-bold tabular-nums">{k.value}</div><div className="mt-2 text-xs text-muted-foreground">{k.hint}</div></div>)}</div>
+    <HypothesisEngine /><RetrainSimulator />
+    <div className="flex flex-wrap gap-5 border-y py-4">
+      <Seg label="Geschäftsbereich" value={line} options={["Alle", "Strom", "Gas", "Mobilfunk", "Internet", "Autostrom"]} onChange={setLine} />
+      <Seg label="Aktionstyp" value={action} options={["Alle", "Vertrieb", "Bindung", "Nur Service"]} onChange={setAction} />
+      <Seg label="Mahnung / Risiko" value={risk} options={["Alle", "Ohne Risiko", "Mahnung / Beschwerde"]} onChange={setRisk} />
+      <Seg label="Kanal" value={channel} options={["Alle", ...Object.values(channelMeta).map(c => c.label)]} onChange={setChannel} />
     </div>
-  );
+    <section className="min-w-0">
+      <div className="mb-4 flex items-center justify-between"><h3 className="text-lg font-semibold">Kampagnenmatrix</h3><span className="text-xs text-muted-foreground">{rows.length} von {customers.length} Kunden</span></div>
+      <div className="overflow-x-auto border-y bg-card"><table className="w-full text-sm"><thead className="bg-secondary text-left text-[11px] uppercase text-muted-foreground"><tr>{["Kunde", "Wohnort", "Segment", "Empfohlene Aktion", "Kanal", "Tonalität", "ΔCLV", "Status"].map(h => <th key={h} className="whitespace-nowrap px-4 py-4 font-semibold">{h}</th>)}</tr></thead><tbody>
+        {rows.map((c, i) => { const flagged = !!c.current_nba.blocked_by_hard_rule; return <Fragment key={c.customer_id}><tr className={cn("border-t align-top", i % 2 === 1 && "bg-secondary/30", flagged && "border-l-4 border-l-warning bg-warning/10", recentlyUpdated === c.customer_id && "flash-update")}>
+          <td className="px-4 py-4"><Button variant="link" size="sm" className="h-auto justify-start rounded-md bg-chart-2/10 px-2 py-1 font-mono text-xs text-chart-2" onClick={() => onOpenCustomer(c.customer_id)} aria-label={`${c.customer_id} in Kunden 360° öffnen`}>{c.customer_id}<ExternalLink className="h-3.5 w-3.5" /></Button><div className="mt-2 whitespace-nowrap text-base font-semibold">{c.name}</div></td>
+          <td className="px-4 py-4">{c.city}</td><td className="px-4 py-4 text-muted-foreground">{primarySegment(c)}</td>
+          <td className="min-w-56 px-4 py-4"><div className="text-base font-semibold">{c.current_nba.product_name}</div><div className="mt-2"><ActionBadge type={c.current_nba.action_type} /></div></td>
+          <td className="px-4 py-4"><ChannelBadge channel={c.current_nba.channel} /></td><td className="px-4 py-4"><span className="inline-flex rounded-md bg-secondary px-3 py-1 font-semibold">{c.current_nba.tone}</span></td><td className="whitespace-nowrap px-4 py-4 font-display font-bold text-success">+{eur(c.current_nba.delta_clv_eur)}</td>
+          <td className="min-w-44 px-4 py-4"><div className="flex flex-col items-start gap-2"><ComplianceBadge blocked={c.current_nba.blocked_by_hard_rule} /><CustomerProfilingBadge c={c} /><span className="text-xs text-muted-foreground">{decisions[decisionKey(c)] === "approved" ? "Freigegeben" : decisions[decisionKey(c)] === "rejected" ? "Abgelehnt" : c.current_nba.product_id === "P-NONE-00" ? "Keine Kontaktaufnahme" : "Freigabe erforderlich"}</span></div></td>
+        </tr>{flagged && <tr className="border-l-4 border-l-warning bg-warning/10"><td colSpan={8} className="px-4 pb-4 text-xs font-medium text-warning-foreground"><ShieldAlert className="mr-1 inline h-3.5 w-3.5" />{c.current_nba.blocked_by_hard_rule} · Sichere Alternative erzwungen</td></tr>}</Fragment>; })}
+        {!rows.length && <tr><td colSpan={8} className="py-10 text-center text-muted-foreground">Keine Kunden entsprechen diesen Filtern.</td></tr>}
+      </tbody></table></div>
+    </section>
+    <section className="border-t pt-6">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4"><div><div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground"><Layers className="h-4 w-4" />Kampagnensteuerung</div><h3 className="mt-1 text-lg font-semibold">Menschliche Freigabe</h3></div><label className="flex items-center gap-3 text-sm"><span>Kontaktschutz · max. 1 Kontakt / 30 Tage</span><Switch checked={fatigue} onCheckedChange={setFatigue} aria-label="Kontaktschutz" /></label></div>
+      <div className="mb-4 border-l-4 border-success bg-success/10 px-4 py-4 text-sm font-semibold" aria-live="polite">Ausgewählte Aktionen: {summary.count} | Erwarteter Gesamtgewinn (ΔCLV): <span className="text-success">+{eur(summary.profit)}</span> | Freigabe-Bereit: {summary.channels} Kanäle</div>
+      <label className="mb-3 flex w-fit cursor-pointer items-center gap-3 text-sm font-semibold"><Checkbox checked={allChecked ? true : summary.count ? "indeterminate" : false} disabled={!pending.length} onCheckedChange={checked => setSelected(checked ? pending.map(decisionKey) : [])} />Alle auswählen</label>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{pending.map(c => { const key = decisionKey(c); return <label key={key} className="flex cursor-pointer items-start gap-3 rounded-lg border bg-card p-4"><Checkbox className="mt-1" aria-label={`${c.name} auswählen`} checked={selected.includes(key)} onCheckedChange={checked => setSelected(prev => checked ? [...prev, key] : prev.filter(k => k !== key))} /><div className="min-w-0 flex-1"><div className="font-semibold">{c.name}</div><div className="text-xs text-muted-foreground">{c.customer_id}</div><div className="my-2 text-sm">{c.current_nba.product_name}</div><div className="flex flex-wrap items-center gap-2"><ChannelBadge channel={c.current_nba.channel} /><span className="whitespace-nowrap rounded-md bg-success/10 px-2 py-1 text-xs font-bold text-success">+{eur(c.current_nba.delta_clv_eur)} ΔCLV</span></div><CustomerProfilingBadge c={c} /></div></label>; })}</div>
+      {!pending.length && <p className="py-6 text-muted-foreground">Keine ausstehenden Entscheidungen.</p>}
+      <div className="mt-5 flex flex-wrap gap-3"><Button disabled={!summary.count} className="h-auto min-h-9 whitespace-normal bg-gradient-amber py-2 font-semibold text-accent-foreground" onClick={() => resolve("approved")}><Send className="h-4 w-4" />Ausgewählte freigeben & pushen</Button><Button variant="outline" disabled={!summary.count} className="h-auto min-h-9 whitespace-normal py-2" onClick={() => resolve("rejected")}><X className="h-4 w-4" />Ausgewählte ablehnen</Button></div>
+    </section>
+  </div>;
 }
